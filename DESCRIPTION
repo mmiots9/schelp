@@ -2,10 +2,28 @@ Package: schelp
 Title: Single Cell Helper Functions
 Version: 4.0.0
 Authors@R: 
-    person("Matteo", "Miotto", "miotsdata@gmail.com", role = c("aut", "cre"),
+    person("Matteo", "Miotto", , "miotsdata@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0003-3288-9011"))
-Description: This package contains helper functions for the various steps of Single-Cell analysis (QC, dimensionality reduction, clustering, etc.).
+Description: This package contains helper functions for the various steps
+    of Single-Cell analysis (QC, dimensionality reduction, clustering,
+    etc.).
 License: MIT + file LICENSE
+URL: https://github.com/mmiots9/schelp
+BugReports: https://github.com/mmiots9/schelp/issues
+Depends:
+    R (>= 4.0.0),
+    Seurat (<= 4.4.0),
+    Seurat (>= 4.0.0)
+Imports: 
+    ggpubr,
+    ggplot2,
+    methods,
+    scales,
+    SeuratObject,
+    stats,
+    utils
+Suggests:
+    Matrix
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
