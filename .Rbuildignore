@@ -1,3 +1,5 @@
+^renv$
+^renv\.lock$
 ^schelp\.Rproj$
 ^\.Rproj\.user$
 ^LICENSE\.md$
