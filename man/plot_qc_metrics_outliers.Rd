@@ -2,7 +2,7 @@
 % Please edit documentation in R/qc.R
 \name{plot_qc_metrics_outliers}
 \alias{plot_qc_metrics_outliers}
-\title{Plot qc metrics outliers.}
+\title{Plot qc metrics outliers}
 \usage{
 plot_qc_metrics_outliers(
   seurat_object,

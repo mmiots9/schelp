@@ -2,7 +2,7 @@
 % Please edit documentation in R/qc.R
 \name{plot_top_n_features}
 \alias{plot_top_n_features}
-\title{Plot top expressed features.}
+\title{Plot top expressed features}
 \usage{
 plot_top_n_features(seurat_object, assay = "RNA", slot = "count", n = 10)
 }

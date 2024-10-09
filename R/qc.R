@@ -575,7 +575,7 @@ view_default_qc_mads <- function(){
 
 
 
-#' Plot qc metrics outliers.
+#' Plot qc metrics outliers
 #'
 #' @description
 #' This function is a wrapper around [plot_violin_outliers()]. It creates a list of violin plots for the desired qc metrics (or meta.data column).
@@ -716,7 +716,7 @@ plot_violin_outliers <- function(seurat_object = seurat_object,
 
 
 
-#' Plot top expressed features.
+#' Plot top expressed features
 #'
 #' @description
 #' This function creates a boxplot representing the top n features, based on median value of % of expression in cells.

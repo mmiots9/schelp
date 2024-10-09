@@ -96,6 +96,7 @@ plot_splitted_dimplots <- function(seurat_object,
   main_plot <- DimPlot(seurat_object, reduction = reduction, group.by = group_by, pt.size = 0.8, dims = dims, shuffle = T, seed = 111) +
     scale_color_manual(values = cols_vector[names(cols_vector) %in% group_by_levels], name = group_by) +
     labs(title = group_by, x = paste(axis_prefix, "1"), y = paste(axis_prefix, "2")) +
+    coord_fixed(ratio = 1) +
     theme(legend.position = "bottom")
 
   # Create subplots
@@ -113,6 +114,7 @@ plot_splitted_dimplots <- function(seurat_object,
     sub_list[[group_level]] <- DimPlot(seurat_object, reduction = reduction, group.by = group_by, shuffle = T, seed = 222) +
       scale_color_manual(values = temp_colors[names(temp_colors) %in% group_by_levels]) +
       labs(title = group_level, x = paste(axis_prefix, "1"), y = paste(axis_prefix, "2")) +
+      coord_fixed(ratio = 1) +
       NoLegend()
   }
 
