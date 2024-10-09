@@ -195,7 +195,7 @@ plot_qc_metrics <- function(seurat_object,
     stop("Please run calculate_qc_metrics on this object before using this function.")
   }
 
-  # Check assay
+  # Get assay
   assay <- assay %||% DefaultAssay(object = seurat_object)
 
   # Create plot for number of counts
@@ -265,7 +265,7 @@ plot_qc_metrics <- function(seurat_object,
 
 
 
-#' Create a correlation plot between 2 different QC metrics.
+#' Create a correlation plot between 2 different QC metrics
 #'
 #' @description
 #' This function creates a correlation plot between two given qc metric (or any continuous variable
@@ -365,6 +365,357 @@ qc_correlation_plot <- function(seurat_object,
 
 
 
+#' Calculate QC metrics outliers with MADs
+#'
+#' @description
+#' This function calculates, for each qc metric previously calculated with [calculate_qc_metrics()] using the MAD approach
+#' (check [scater::isOutlier()] for more info).
+#' By default, nCount and nFeature for the current assay, as well as mitoRatio and riboRatio are examinated. To see default values,
+#' run [view_default_qc_mads()].
+#' For each metric, it adds a new column in meta.data called metric_outlier which mark whether a cell is an outlier (TRUE) for that metric or not (FALSE);
+#' it also creates a dataframe in seurat_object@misc$qc_thresholds containing the calculated threshold values.
+#'
+#' @section Add custom metrics:
+#' To add custom metrics, provide a list as argument to `extra` in this format:
+#' list("name_of_meta.data_column" = list("nmads" = c(lower_value, upper_value), "log" = boolean)). Both nmads and log are REQUIRED and cannot be omitted.
+#' lower_value or upper_value can be set to `NA` if that threshold should not be calculated.
+#'
+#' @section Override/skip default values:
+#' To override default values, provide the corresponding list in extra argument as if it is an extra column to calculate. It will override default parameters for that metric.
+#' To skip a default metric, set it to NULL as metric element list (e.g `extra = list("mitoRatio" = NULL)`)
+#'
+#'
+#' @param seurat_object Seurat object to use.
+#' @param assay Assay to use to select nCount and nFeature meta.data. By default it takes the current active assay.
+#' @param batch Name of the column to pass to `isOutlier(batch)`. Default to "orig.ident".
+#' @param extra Optional list containing custom metrics to calculate or default values to override.
+#'
+#' @returns A Seurat object.
+#'
+#' @concept QC
+#'
+#' @examples
+#' data("pbmc_small")
+#' pbmc_small <- calculate_qc_metrics(pbmc_small)
+#'
+#' # Default with no customization
+#' pbmc_small <- calculate_qc_mad_outliers(pbmc_small)
+#'
+#' # Setting batch and omit riboRatio calculation
+#' pbmc_small <- calculate_qc_mad_outliers(pbmc_small,
+#'                                         batch = "groups",
+#'                                         extra = list("riboRatio" = NULL))
+#'
+#'
+#' @export
+calculate_qc_mad_outliers <- function(seurat_object,
+                                      assay = NULL,
+                                      batch = "orig.ident",
+                                      extra = list()) {
+
+  # Get assay
+  assay <- assay %||% DefaultAssay(object = seurat_object)
+
+  # Create empty dataframe to store threshold values
+  thresholds_df <- data.frame("metric" = character(),
+                              "type" = character(),
+                              "batch" = character(),
+                              "value" = numeric()
+  )
+
+  # Create parameter list
+  parameter_list <- create_parameter_list(assay = assay, extra = extra)
+
+  # Loop through parameters
+  for (parameter_name in unique(names(parameter_list))) {
+
+    # Skip if null
+    if (!is_null(parameter_list[[parameter_name]])) {
+
+      # Create temporary boolean vector that stores F, so that when | with isOutlier results
+      # will be T only for real outliers
+      tmp_out <- rep(F, nrow(seurat_object@meta.data))
+
+      # Skip if higher mads is NA
+      if (!is.na(parameter_list[[parameter_name]]$nmads[2])) {
+        tmp_out_higher <- isOutlier(seurat_object@meta.data[, parameter_name],
+                                    nmads = parameter_list[[parameter_name]]$nmads[2],
+                                    type = "higher",
+                                    log = parameter_list[[parameter_name]]$log,
+                                    batch = seurat_object@meta.data[, batch])
+
+        tmp_out <- tmp_out | tmp_out_higher
+
+        # Add to threshold df
+        tmp_thresholds <- attr(tmp_out_higher, "thresholds")
+        thresholds_df <- rbind(thresholds_df,
+                               data.frame("metric" = rep(parameter_name, dim(tmp_thresholds)[2]),
+                                          "type" = c("higher"),
+                                          "batch" = colnames(tmp_thresholds),
+                                          "value" = tmp_thresholds[2, ]
+                                          )
+                               )
+
+      }
+
+      # Skip if lower mads is NA
+      if (!is.na(parameter_list[[parameter_name]]$nmads[1])) {
+        tmp_out_lower <- isOutlier(seurat_object@meta.data[, parameter_name],
+                                   nmads = parameter_list[[parameter_name]]$nmads[1],
+                                   type = "lower",
+                                   log = parameter_list[[parameter_name]]$log,
+                                   batch = seurat_object@meta.data[, batch])
+
+        tmp_out <- tmp_out | tmp_out_lower
+
+        # Add to threshold df
+        tmp_thresholds <- attr(tmp_out_higher, "thresholds")
+        thresholds_df <- rbind(thresholds_df,
+                               data.frame("metric" = rep(parameter_name, dim(tmp_thresholds)[2]),
+                                          "type" = c("lower"),
+                                          "batch" = colnames(tmp_thresholds),
+                                          "value" = tmp_thresholds[1, ]
+                                          )
+                               )
+      }
+
+      # Create column in seurat object
+      seurat_object@meta.data[, paste0(parameter_name, "_outlier")] <- tmp_out
+
+    }
+
+
+  }
+
+  # Insert thresholds df in seurat object
+  seurat_object@misc$qc_thresholds <- thresholds_df
+
+  return(seurat_object)
+}
+
+
+
+#' Create parameter list for MAD outlier
+#'
+#' @description
+#' This function creates a list with the parameter to use for MAD outlier QC calculation.
+#'
+#' @param assay Assay to use to select nCount and nFeature meta.data. By default it takes the current active assay.
+#' @param extra Optional list containing custom metrics to calculate or default values to override.
+#'
+#' @returns A list with elemets like this: "name_of_meta.data_column" = list("nmads" = c(lower_value, upper_value), "log" = boolean).
+#'
+#' @concept QC
+create_parameter_list <- function(assay = "RNA",
+                                  extra = list()) {
+
+  # Set default parameters
+  defaults <- list(
+     "nCount" = list(
+      "nmads" = c(2, 3),
+      "log" = T
+    ),
+     "nFeature" = list(
+      "nmads" = c(2, 3),
+      "log" = T
+    ),
+    mitoRatio = list(
+      "nmads" = c(NA, 2),
+      "log" = T
+    ),
+    riboRatio = list(
+      "nmads" = c(2, NA),
+      "log" = T
+    )
+  )
+
+  # Correct names of first 2 elements of defaults
+  names(defaults)[1:2] <- c(paste0("nCount_", assay), paste0("nFeature_", assay))
+
+  return(c(extra,
+           defaults))
+}
+
+
+
+#' View default QC MAD parameters
+#'
+#' @description
+#' This function is used to see the default values for [calculate_qc_mad_outliers()] metrics.
+#'
+#' @returns A tibble with columns:
+#' * metric: name of the metric
+#' * lower.nmads: value of the lower nmads used to calculate outliers
+#' * higher.nmads: value of the higher nmads used to calculate outliers
+#' * log: whether outlier detection is done on log-transformed data
+#'
+#' @concept QC
+#'
+#' @examples
+#' view_default_qc_mads()
+#'
+#' @export
+view_default_qc_mads <- function(){
+
+  parameter_list <- create_parameter_list()
+
+  print(as.data.frame(unlist(parameter_list)) %>%
+    tibble::rownames_to_column("what") %>%
+    tidyr::separate(col = "what", into = c("metric", "type"), sep = "\\.") %>%
+    dplyr::mutate("type" = dplyr::case_when(
+      type == "nmads1" ~ "lower.nmads",
+      type == "nmads2" ~ "higher.nmads",
+      TRUE ~ .data$type
+    )) %>%
+    tidyr::pivot_wider(names_from = .data$type, values_from = 3) %>%
+    dplyr::mutate(log = as.logical(log))
+  )
+
+}
+
+
+
+#' Plot qc metrics outliers.
+#'
+#' @description
+#' This function is a wrapper around [plot_violin_outliers()]. It creates a list of violin plots for the desired qc metrics (or meta.data column).
+#'
+#' @param seurat_object Seurat object to use.
+#' @param split_by Name of the column used to group_by the violins (usually should correspond to the one used as `batch` in [calculate_qc_mad_outliers()]).
+#' Default to "orig.ident".
+#' @param fill_vector Optional named vector used to assign fill colors to the different group of fill variable.
+#' Default to NULL.
+#' @param metrics Named vector with metrics to plot as names and the desiretd x_trans as value.
+#' Default to metrics = c("nCount_RNA" = "log10", "nFeature_RNA" = "log10", "mitoRatio" = "identity", "riboRatio" = "identity")
+#' @param return_list Whether to return a list of ggplot objects (TRUE) or a ggarrange object with all the plots (FALSE). Default to FALSE.
+#'
+#' @returns A list of ggplot objects or a ggarrange object.
+#'
+#' @concept QC
+#'
+#' @examples
+#' data("pbmc_small")
+#' pbmc_small <- calculate_qc_metrics(pbmc_small)
+#' pbmc_small <- calculate_qc_mad_outliers(pbmc_small)
+#'
+#' # Basic plot
+#' plot_qc_metrics_outliers(pbmc_small)
+#'
+#' # Split violin based on a column
+#' pbmc_small <- calculate_qc_mad_outliers(pbmc_small, batch = "groups")
+#' plot_qc_metrics_outliers(pbmc_small, split_by = "groups")
+#'
+#' @export
+plot_qc_metrics_outliers <- function(seurat_object,
+                                     split_by = "orig.ident",
+                                     fill_vector = NULL,
+                                     metrics = c("nCount_RNA" = "log10",
+                                                 "nFeature_RNA" = "log10",
+                                                 "mitoRatio" = "identity",
+                                                 "riboRatio" = "identity"),
+                                     return_list = FALSE) {
+
+  # Create empty list to store plots
+  plot_list <- list()
+
+  # Loop through metrics
+  for (metric in names(metrics)) {
+    plot_list["metric"] <- plot_violin_outliers(seurat_object = seurat_object,
+                                                split_by = split_by,
+                                                metric = metric,
+                                                title = paste0(metric, "/cell distribution"),
+                                                fill_vector = fill_vector,
+                                                x_trans = metrics[metric])
+  }
+
+  # Return list if to return
+  if (return_list) {return(plot_list)}
+
+  # Merge all plots
+  all_plots <- ggarrange(plotlist = plot_list,
+                         ncol = 2,
+                         align = "hv" ,
+                         common.legend = T)
+
+  return(all_plots)
+}
+
+
+#' Plot violin outlier thresholds
+#'
+#' @description
+#' This function creates is used to represent the distribution of the values of a desired metric (meta.data column)
+#' and the corresponding thresholds (if available). It can help in the visual inspection of nmads to use when calculating
+#' outliers with [calculate_qc_mad_outliers()].
+#'
+#' @param seurat_object Seurat object to use.
+#' @param split_by Name of the column used to group_by the violins (usually should correspond to the one used as `batch` in [calculate_qc_mad_outliers()]).
+#' Default to "orig.ident".
+#' @param metric Name of the column to plot. Default to "nCount_RNA".
+#' @param title Title to add to the plot. Default to "".
+#' @param x_trans Transformation to pass to scale_x_continuous(trans). Default to "identity".
+#' @param fill_vector Optional named vector used to assign fill colors to the different group of fill variable.
+#' Default to NULL.
+#'
+#' @returns A ggplot list object with the plot.
+#'
+#' @concept QC
+#'
+#' @examples
+#' data("pbmc_small")
+#' pbmc_small <- calculate_qc_metrics(pbmc_small)
+#' pbmc_small <- calculate_qc_mad_outliers(pbmc_small)
+#'
+#' # Basic plot
+#' plot_violin_outliers(pbmc_small)
+#'
+#' # Changing metric
+#' plot_violin_outliers(pbmc_small, metric = "riboRatio")
+#'
+#' @export
+plot_violin_outliers <- function(seurat_object = seurat_object,
+                                 split_by = "orig.ident",
+                                 metric = "nCount_RNA",
+                                 title = "",
+                                 x_trans = "identity",
+                                 fill_vector = NULL) {
+
+  # Filter threshold df
+  tmp_thresholds_df <- seurat_object@misc$qc_thresholds[seurat_object@misc$qc_thresholds$metric == metric,]
+  tmp_thresholds_df$batch <- factor(tmp_thresholds_df$batch)
+
+  # Create plot
+  violin_plot <- ggplot() +
+    geom_violin(data = seurat_object@meta.data,
+                mapping = aes_string(y = split_by,
+                                     x = metric,
+                                     fill = split_by)) +
+    geom_segment(data = tmp_thresholds_df,
+                 aes(y = as.numeric(.data$batch) - .2, yend = as.numeric(.data$batch) + .2, x = .data$value, xend = .data$value),
+                 linewidth = 1.5) +
+    scale_y_discrete(expand = expansion(mult = c(0.01, 0))) +
+    scale_x_continuous(trans = x_trans,
+                       labels = function(x)scales::comma(x),
+                       expand = expansion(mult = c(0, 0.15))) +
+    theme_classic() +
+    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+          axis.title = element_text(face = "bold", size = 12),
+          axis.text = element_text(size = 10),
+          legend.position = "right")
+
+  # Add fill colors if provided
+  if (!is.null(fill_vector)) {
+    violin_plot <- violin_plot +
+      scale_fill_manual(values = fill_vector)
+  }
+
+  # 4. Return
+  return(violin_plot)
+
+}
+
+
+
 #' Plot top expressed features.
 #'
 #' @description
@@ -383,16 +734,16 @@ qc_correlation_plot <- function(seurat_object,
 #' data("pbmc_small")
 #'
 #' # Basic plot
-#' plot_top_n_genes(pbmc_small)
+#' plot_top_n_features(pbmc_small)
 #'
 #' # Specify n
-#' plot_top_n_genes(pbmc_small, n = 25)
+#' plot_top_n_features(pbmc_small, n = 25)
 #'
 #' @export
-plot_top_n_genes <- function(seurat_object,
-                             assay = "RNA",
-                             slot = "count",
-                             n = 10) {
+plot_top_n_features <- function(seurat_object,
+                                assay = "RNA",
+                                slot = "count",
+                                n = 10) {
 
   # Get the most expressed genes
   mat <- GetAssayData(seurat_object, slot = slot, assay = assay)

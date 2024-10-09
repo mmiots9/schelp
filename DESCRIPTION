@@ -15,13 +15,18 @@ Depends:
     Seurat (<= 4.4.0),
     Seurat (>= 4.0.0)
 Imports: 
+    dplyr,
     ggplot2,
     ggpubr,
+    magrittr,
     methods,
     rlang,
     scales,
+    scater,
     SeuratObject,
     stats,
+    tibble,
+    tidyr,
     utils,
     viridisLite
 Suggests:

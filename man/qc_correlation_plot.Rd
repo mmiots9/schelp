@@ -2,7 +2,7 @@
 % Please edit documentation in R/qc.R
 \name{qc_correlation_plot}
 \alias{qc_correlation_plot}
-\title{Create a correlation plot between 2 different QC metrics.}
+\title{Create a correlation plot between 2 different QC metrics}
 \usage{
 qc_correlation_plot(
   seurat_object,
