@@ -1,0 +1,11 @@
+pandoc: 3.1.11
+pkgdown: 2.1.1
+pkgdown_sha: ~
+articles:
+  articles/clustering: clustering.html
+  articles/dimred: dimred.html
+  articles/qc: qc.html
+last_built: 2024-10-10T14:04Z
+urls:
+  reference: https://mmiots9.github.io/schelp/reference
+  article: https://mmiots9.github.io/schelp/articles
