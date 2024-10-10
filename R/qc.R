@@ -105,9 +105,9 @@ qc_density_plot <- function(seurat_object,
                        expand = expansion(mult = c(0,0)),
                        trans = x_trans) +
     theme_classic() +
-    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
-          axis.title = element_text(face = "bold", size = 12),
-          axis.text = element_text(size = 10),
+    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 8),
+          axis.title = element_text(face = "bold", size = 6),
+          axis.text = element_text(size = 5),
           axis.text.y = element_blank(),
           axis.ticks.y = element_blank(),
           legend.position = "right")
@@ -120,10 +120,10 @@ qc_density_plot <- function(seurat_object,
 
     # Add to plot
     density_plot <- density_plot +
-      geom_vline(xintercept = threshold, color = "red", size = 1.2) +
+      geom_vline(xintercept = threshold, color = "red", size = 0.8) +
       geom_text(aes(x = threshold, max_density, label = "Threshold"),
                 color = "red",
-                hjust = -0.1, size = 4)
+                hjust = -0.1, size = 2)
   }
 
   # Add fill color vector if provided
@@ -160,6 +160,7 @@ qc_density_plot <- function(seurat_object,
 #' @param mito_thresh Value of the mitoRatio threshold line to pass to qc_density_plot(threshold). Default to 0.15.
 #' @param ribo_thresh Value of the riboRatio threshold line to pass to qc_density_plot(threshold). Default to 0.05.
 #' @param hemo_thresh Value of the hemoRatio threshold line to pass to qc_density_plot(threshold). Default to 0.NULL.
+#' @param return_list Whether to return a list of ggplot objects (TRUE) or a ggarrange object with all the plots (FALSE). Default to FALSE.
 #'
 #' @returns A ggarrange object with the plots.
 #'
@@ -188,7 +189,8 @@ plot_qc_metrics <- function(seurat_object,
                             log10GenesPerUMI_thresh = 0.8,
                             mito_thresh = 0.15,
                             ribo_thresh = 0.05,
-                            hemo_thresh = NULL) {
+                            hemo_thresh = NULL,
+                            return_list = FALSE) {
 
   # Check if calculate_qc_metrics have been run
   if (!any((grepl("calculate_qc_metrics", names(seurat_object@commands))))) {
@@ -254,9 +256,16 @@ plot_qc_metrics <- function(seurat_object,
                                alpha = alpha,
                                threshold = hemo_thresh)
 
+  # Return list if to return
+  if (return_list) {return(list("count" = count_plot,
+                                "feature" = feature_plot,
+                                "lo10UmiPerCell" = complexity_plot,
+                                "mito" = mito_plot,
+                                "ribo" = ribo_plot,
+                                "hemo" = hemo_plot))}
+
   # Merge all plots
-  all_plots <- ggarrange(count_plot, feature_plot, complexity_plot, mito_plot, ribo_plot, hemo_plot,
-                         ncol = 3, nrow = 2,
+  all_plots <- ggarrange(plotlist = list(count_plot, feature_plot, complexity_plot, mito_plot, ribo_plot, hemo_plot),
                          align = "hv" ,
                          common.legend = T)
 
@@ -317,12 +326,11 @@ qc_correlation_plot <- function(seurat_object,
     geom_point(aes_string(color = color, shape = shape)) +
     labs(title = title) +
     scale_y_continuous(labels = scales::comma,
-                       expand = expansion(mult = c(0, 0.05)),
+                       expand = expansion(mult = c(0.05, 0.05)),
                        trans = y_trans) +
     scale_x_continuous(labels = scales::comma,
-                       expand = expansion(mult = c(0,0.05)),
+                       expand = expansion(mult = c(0.05, 0.05)),
                        trans = x_trans) +
-    scale_color_gradient(low = "gray90", high = "black") +
     theme_classic() +
     theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
           axis.title = element_text(face = "bold", size = 12),
@@ -469,7 +477,7 @@ calculate_qc_mad_outliers <- function(seurat_object,
         tmp_out <- tmp_out | tmp_out_lower
 
         # Add to threshold df
-        tmp_thresholds <- attr(tmp_out_higher, "thresholds")
+        tmp_thresholds <- attr(tmp_out_lower, "thresholds")
         thresholds_df <- rbind(thresholds_df,
                                data.frame("metric" = rep(parameter_name, dim(tmp_thresholds)[2]),
                                           "type" = c("lower"),
@@ -620,7 +628,7 @@ plot_qc_metrics_outliers <- function(seurat_object,
 
   # Loop through metrics
   for (metric in names(metrics)) {
-    plot_list["metric"] <- plot_violin_outliers(seurat_object = seurat_object,
+    plot_list[[metric]] <- plot_violin_outliers(seurat_object = seurat_object,
                                                 split_by = split_by,
                                                 metric = metric,
                                                 title = paste0(metric, "/cell distribution"),
@@ -633,7 +641,6 @@ plot_qc_metrics_outliers <- function(seurat_object,
 
   # Merge all plots
   all_plots <- ggarrange(plotlist = plot_list,
-                         ncol = 2,
                          align = "hv" ,
                          common.legend = T)
 
@@ -689,10 +696,12 @@ plot_violin_outliers <- function(seurat_object = seurat_object,
     geom_violin(data = seurat_object@meta.data,
                 mapping = aes_string(y = split_by,
                                      x = metric,
-                                     fill = split_by)) +
+                                     fill = split_by),
+                draw_quantiles = 0.5) +
     geom_segment(data = tmp_thresholds_df,
-                 aes(y = as.numeric(.data$batch) - .2, yend = as.numeric(.data$batch) + .2, x = .data$value, xend = .data$value),
-                 linewidth = 1.5) +
+                 aes(y = as.numeric(.data$batch) - .3, yend = as.numeric(.data$batch) + .3, x = .data$value, xend = .data$value),
+                 linewidth = .8,
+                 linetype = "11") +
     scale_y_discrete(expand = expansion(mult = c(0.01, 0))) +
     scale_x_continuous(trans = x_trans,
                        labels = function(x)scales::comma(x),

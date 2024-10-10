@@ -15,7 +15,8 @@ plot_qc_metrics(
   log10GenesPerUMI_thresh = 0.8,
   mito_thresh = 0.15,
   ribo_thresh = 0.05,
-  hemo_thresh = NULL
+  hemo_thresh = NULL,
+  return_list = FALSE
 )
 }
 \arguments{
@@ -42,6 +43,8 @@ Default to NULL.}
 \item{ribo_thresh}{Value of the riboRatio threshold line to pass to qc_density_plot(threshold). Default to 0.05.}
 
 \item{hemo_thresh}{Value of the hemoRatio threshold line to pass to qc_density_plot(threshold). Default to 0.NULL.}
+
+\item{return_list}{Whether to return a list of ggplot objects (TRUE) or a ggarrange object with all the plots (FALSE). Default to FALSE.}
 }
 \value{
 A ggarrange object with the plots.
