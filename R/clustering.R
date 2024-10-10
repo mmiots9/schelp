@@ -264,7 +264,7 @@ plot_clusters_metadata <- function(seurat_object,
                        vars = c(group_by, split_by)) %>%
     dplyr::count(!!rlang::sym(group_by), !!rlang::sym(split_by)) %>%
     dplyr::group_by(!!rlang::sym(split_by)) %>%
-    tibble::as.tibble() %>%
+    tibble::as_tibble() %>%
     tidyr::spread(key = !!rlang::sym(group_by), value = .data$n, fill = "-", data = .) %>%
     as.data.frame()
 
