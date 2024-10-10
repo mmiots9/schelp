@@ -1,0 +1,137 @@
+---
+title: "Quality control"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.dpi = 100,
+  fig.width = 14,
+  fig.height = 8,
+  fig.align = "center",
+  warning = FALSE
+)
+```
+
+```{r setup}
+library(schelp)
+pbmc_small <- NULL
+```
+
+## Load data
+
+We will use the `pbmc_small` dataset provided by `SeuratObject`.
+
+```{r data_load}
+data("pbmc_small")
+pbmc_small
+```
+
+## Calculate qc metrics
+
+The first helper function we will discuss is `calculate_qc_metrics`. This function is used to calculate different QC metrics and insert them into `meta.data` slot of the object.
+
+The metrics that it calculates are:
+
+-   log10GenesPerUMI
+-   mitoRatio: ratio of mitochondrial gene expression. The pattern used to identify genes as mitochondrial can be set through `mito` argument (e.g. for mouse "\^Mt-")
+-   ribooRatio: ratio of ribosomal gene expression. The pattern used to identify genes as ribosomal can be set through `ribo` argument (e.g. for mouse "\^Rp[sl]")
+-   hemoRatio: ratio of hemoglobin gene expression. The pattern used to identify genes as hemoglobin can be set through `ribo` argument (e.g. for mouse "\^Hb[\^p]")
+
+```{r calculate-qc-metrics}
+pbmc_small <- calculate_qc_metrics(pbmc_small)
+str(pbmc_small@meta.data)
+```
+
+## Plot QC metrics
+
+Once calculated, we can visualize the distribution of these metrics through the function `plot_qc_metrics`.
+
+```{r qc_plots, fig.alt="Density plots of QC metrics"}
+qc_plots <- plot_qc_metrics(pbmc_small,
+                feature_thresh = 50,
+                count_thresh = 100,
+                mito_thresh = NULL)
+print(qc_plots)
+```
+
+We can also split the data into different groups (e.g. samples, batch, etc.) passing the `fill` argument to a meta.data column:
+
+```{r qc-plots-groups, fig.alt="Density plots of QC metrics split by groups"}
+qc_plots <- plot_qc_metrics(pbmc_small, 
+                feature_thresh = 50,
+                count_thresh = 100,
+                fill = "groups",
+                mito_thresh = NULL)
+print(qc_plots)
+```
+
+Threshold vertical lines can be set with the following arguments:
+
+-   count_thresh
+-   feature_thresh
+-   log10GenesPerUMI_thresh
+-   mito_thresh
+-   ribo_thresh
+-   hemo_thresh
+
+And disabled setting them as `NULL`.
+
+> ***NOTE:*** This function is a wrapper around `qc_density_plot()`. Check it out, as it can be also useful to plot other `meta-data` rather than qc metrics.
+
+## MAD outliers
+
+In modern SC design, multiple samples from different sources/design/modalities are analyzed together. For this reason, the MAD (Median Absolute Deviation) approach to calculate QC threshold is taking space in the field.
+
+With `schelp`, there are a couple of helper functions to calculate and visualize MAD thresholds for the different metrics. The first function is `calculate_qc_mad_outliers()`, which calculates MAD thresholds for the previously-calculated metrics, and creates an "_outlier" for each of them.
+
+```{r calculate-qc-mad-outliers}
+pbmc_small <- calculate_qc_mad_outliers(pbmc_small, batch = "groups")
+str(pbmc_small@meta.data)
+```
+
+With the `batch` argument, we can define which `meta.data` column stores the information about samples, so that MADs are calculated for each of them.
+
+The calculated thresholds are stored in the `misc$qc_thresholds` slot:
+
+```{r show-qc-thresholds}
+pbmc_small@misc$qc_thresholds
+```
+
+And we can visualize them onto distribution plots with `plot_qc_metrics_outliers()`, with threshold lines plotted as dashed segments:
+
+```{r plot-qc-metric-outliers, fig.alt="Violin plot of qc metrics with MAD thresholds"}
+plot_qc_metrics_outliers(pbmc_small, split_by = "groups")
+```
+
+We can see that with default parameters, the actual thresholds are too loose. We can change the number of MADs to set thresholds by passing a list to the `extra` argument. Let's see:
+
+```{r qc-outliers-new-mads, fig.alt="Violin plot of qc metrics with MAD thresholds with custom n mads"}
+pbmc_small <- calculate_qc_mad_outliers(pbmc_small, 
+                                        batch = "groups", 
+                                        extra = list("nCount_RNA" = list("nmads" = c(1.5, 2), #lower, higher
+                                                                         "log" = T),
+                                                     "nFeature_RNA" = list("nmads" = c(1.5, 2),
+                                                                           "log" = T))
+                                        )
+plot_qc_metrics_outliers(pbmc_small, 
+                         split_by = "groups")
+```
+
+We can then use the newly created "_outlier" columns to highlight outlier cells in correlation plots with `qc_correlation_plot()`:
+
+```{r qc-correlation-plot, fig.alt="Correlation plot between nCount and nFeature"}
+qc_correlation_plot(seurat_object = pbmc_small, 
+                    metric_x = "nCount_RNA", metric_y = "nFeature_RNA", 
+                    color = "nCount_RNA_outlier", shape = "nFeature_RNA_outlier")
+```
+
+
+## Plot top n features
+Lastly, we can look at the most expressed features with `plot_top_n_features()`:
+```{r top-n-features, fig.alt="Top 10 expressed features"}
+plot_top_n_features(pbmc_small, slot = "data", n = 10)
+```
+
+The `slot` and `assay` can be passed as argument to set where to get the data from.

@@ -1,0 +1,16 @@
+url: ~
+template:
+  bootstrap: 5
+articles:
+- title: "Quality control"
+  navbar: ~
+  contents:
+    - articles/qc
+- title: "Dimensionality reduction"
+  navbar: ~
+  contents:
+    - articles/dimred
+- title: "Clustering"
+  navbar: ~
+  contents:
+    - articles/clustering

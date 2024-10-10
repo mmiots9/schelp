@@ -1,0 +1,64 @@
+---
+title: "Dimensionality reduction"
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.dpi = 100,
+  fig.width = 14,
+  fig.height = 8,
+  fig.align = "center",
+  warning = FALSE
+)
+```
+
+```{r setup}
+library(schelp)
+pbmc_small <- NULL
+```
+
+## Load data
+
+We will use the `pbmc_small` dataset provided by `SeuratObject`.
+
+```{r data_load}
+data("pbmc_small")
+pbmc_small
+```
+
+## Plot top variable features
+One of the first step after QC is to find the variable features in our dataset. Once done, we can visualize the top variable features using `plot_variable_features()`, which is a wrapper around `Seurat::VariableFeaturePlot()` function. It plots the variable features and labels the top_n ones:
+```{r variable-features, fig.alt = "Variable feature plot"}
+plot_variable_features(pbmc_small, top_n = 15)
+```
+
+> ***Note***: The `top_n` argument is used to set the number of highly variable features to label, NOT how many variable feature to calculate, as calculation should be done prior to run this function (e.g. with `Seurat::FindVariableFeatures()`).
+
+## Calculate optimal dimensions
+Usually, after PCA, another dimensionality reduction to perform is UMAP or TSNE. To decide how many PCs to use one should look at the elbow plot, or use a more [quantitative approach](https://hbctraining.github.io/scRNA-seq_online/lessons/elbow_plot_metric.html).
+
+Here, this approach is performed using `calc_dims()` function:
+```{r calc-dim}
+pbmc_small <- calc_dims(pbmc_small, reduction = "pca")
+```
+
+
+## Plot splitted dimplot
+Another helpful method I always use in my analysis to understand whether some `meta.data` column is a unwanted source of variability is `plot_splitted_dimplots()`. Using any reduction it shows how every level of the chosen meta.data column distribute in the dimension plot:
+
+```{r plot-splitted-dimplots, fig.alt = "Splitted dimplot pca"}
+plot_splitted_dimplots(pbmc_small, group_by = "groups", 
+                       heights = c(2, 1))
+```
+
+
+It can be applied to any reduction. I use it a lot to understand whether integration worked well:
+```{r plot-splitted-dimplots-tsne, fig.alt = "Splitted dimplot tsne"}
+plot_splitted_dimplots(pbmc_small, reduction = "tsne",
+                       group_by = "groups", 
+                       heights = c(2, 1))
+```
+
+
